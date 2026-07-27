@@ -1,7 +1,22 @@
+import sys
+from pathlib import Path
 from pypdf import PdfReader
 
-# open pdf file
-reader = PdfReader("data/e-cigarette-review.pdf")
+
+if len(sys.argv) < 2:
+    print("Usage: python src/extract_pdf.py <pdf_path>")
+    sys.exit(1)
+
+# Open the PDF file supplied by the user
+pdf_path = Path(sys.argv[1])
+
+# Stop early with a clear error if the supplied path is missing or is not a file.
+if not pdf_path.is_file():
+    print(f"Error: The file '{pdf_path}' does not exist or is not a valid file.")
+    sys.exit(1)
+
+reader = PdfReader(pdf_path)
+
 
 # store extracted text from each page in a list
 extracted_pages = []
