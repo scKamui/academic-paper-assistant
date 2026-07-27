@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
+
 from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 
 if len(sys.argv) < 2:
@@ -15,7 +17,17 @@ if not pdf_path.is_file():
     print(f"Error: The file '{pdf_path}' does not exist or is not a valid file.")
     sys.exit(1)
 
-reader = PdfReader(pdf_path)
+# Reject files that do not have a PDF extension.
+if pdf_path.suffix.lower() != ".pdf":
+    print(f"Error: The file '{pdf_path}' is not a PDF.")
+    sys.exit(1)
+
+# Catch files that have a PDF extension but contain invalid or corrupted data.
+try:
+    reader = PdfReader(pdf_path)
+except PdfReadError:
+    print(f"Error: The file '{pdf_path}' could not be read as a valid PDF.")
+    sys.exit(1)
 
 
 # store extracted text from each page in a list
