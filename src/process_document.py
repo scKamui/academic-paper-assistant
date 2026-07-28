@@ -6,6 +6,7 @@ from src.extract_pdf import extract_pages
 from src.embeddings import embed_chunks, load_embedding_model
 from src.search import search_chunks
 from src.clean_text import remove_reference_content
+from src.prompt import build_rag_prompt
 
 
 def process_document(pdf_path, model, chunk_size=1000, overlap=200):
@@ -71,9 +72,19 @@ def main():
         default=3,
         help="Number of matching passages to return.",
     )
+
+    # optionally display the complete grounded prompt
+    parser.add_argument(
+        "--show-prompt",
+        action="store_true",
+        help="Display the grounded prompt created from the retrieved passages.",
+    )
     
     # read the command-line arguments
     args = parser.parse_args()
+
+    if args.show_prompt and not args.query:
+        parser.error("--show-prompt requires --query")
 
     # load the embedding model once for this processing session
     model = load_embedding_model()
@@ -94,7 +105,7 @@ def main():
     searchable_page_count = len(result["searchable_pages"])
     chunk_count = len(result["chunks"])
 
-    # return the extracted pages, searchable pages, chunks, and embeddings
+    # display a summary of the processed document
     print(f"Pages extracted: {page_count}")
     print(f"Searchable pages: {searchable_page_count}")
     print(f"Chunks created: {chunk_count}")
@@ -121,6 +132,14 @@ def main():
                 f"similarity {search_result['score']:.3f}" 
             )
             print(search_result["text"][:500])
+
+        if args.show_prompt:
+            prompt = build_rag_prompt(args.query, search_results)
+
+            print("\nGrounded prompt:")
+            print("-" * 80)
+            print(prompt)
+            print("-" * 80)
 
 
 if __name__ == "__main__":
