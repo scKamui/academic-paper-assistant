@@ -1,4 +1,5 @@
 import argparse
+from email import parser
 from pathlib import Path
 
 from src.chunk_text import chunk_pages
@@ -32,11 +33,33 @@ def main():
         help="Path to the PDF that should be processed.",
     )
 
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=1000,
+        help="Maximum number of characters in each chunk.",
+    )
+
+    parser.add_argument(
+        "--overlap",
+        type=int,
+        default=200,
+        help="Target number of overlapping characters between chunks.",
+    )
+
+    
     # read the command-line arguments
     args = parser.parse_args()
 
     # process the document
-    result = process_document(args.pdf_path)
+    try:
+        result = process_document(
+            args.pdf_path,
+            chunk_size=args.chunk_size,
+            overlap=args.overlap,
+        )
+    except ValueError as error:
+        parser.error(str(error))
 
     page_count = len(result["pages"])
     chunk_count = len(result["chunks"])
