@@ -5,14 +5,18 @@ from src.chunk_text import chunk_pages
 from src.extract_pdf import extract_pages
 from src.embeddings import embed_chunks, load_embedding_model
 from src.search import search_chunks
+from src.clean_text import remove_reference_content
 
 
 def process_document(pdf_path, model, chunk_size=1000, overlap=200):
     # extract page-numbered text from the PDF
     extracted_pages = extract_pages(pdf_path)
 
+    # remove bibliography content before creating searchable chunks
+    searchable_pages = remove_reference_content(extracted_pages)
+
     # split the extracted pages into page-aware chunks
-    chunks = chunk_pages(extracted_pages, chunk_size=chunk_size, overlap=overlap)
+    chunks = chunk_pages(searchable_pages, chunk_size=chunk_size, overlap=overlap)
 
     # convert chunks into embedding vectors
     embeddings = embed_chunks(chunks, model)
@@ -20,6 +24,7 @@ def process_document(pdf_path, model, chunk_size=1000, overlap=200):
     # return both results in one dictionary
     return {
         "pages": extracted_pages,
+        "searchable_pages": searchable_pages,
         "chunks": chunks,
         "embeddings": embeddings,
     }
@@ -73,6 +78,7 @@ def main():
     # load the embedding model once for this processing session
     model = load_embedding_model()
 
+
     # process the document
     try:
         result = process_document(
@@ -85,9 +91,12 @@ def main():
         parser.error(str(error))
 
     page_count = len(result["pages"])
+    searchable_page_count = len(result["searchable_pages"])
     chunk_count = len(result["chunks"])
 
+    # return the extracted pages, searchable pages, chunks, and embeddings
     print(f"Pages extracted: {page_count}")
+    print(f"Searchable pages: {searchable_page_count}")
     print(f"Chunks created: {chunk_count}")
     print(f"Embedding matrix: {result['embeddings'].shape}")
 
@@ -109,7 +118,7 @@ def main():
             print(
                 f"\n{rank}. Page {search_result['page_number']}, "
                 f"chunk {search_result['chunk_number']}, "
-                f"similarity {search_result['score']:.3f}"
+                f"similarity {search_result['score']:.3f}" 
             )
             print(search_result["text"][:500])
 
