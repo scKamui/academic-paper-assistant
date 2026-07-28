@@ -1,4 +1,8 @@
-from src.clean_text import remove_reference_content
+from src.clean_text import (
+    remove_reference_content,
+    remove_repeated_lines,
+)
+
 
 
 def test_removes_references_but_keeps_later_figures():
@@ -46,3 +50,43 @@ def test_removes_references_but_keeps_later_figures():
 
     assert "Citation A" not in cleaned_text
     assert "Citation B" not in cleaned_text
+
+
+
+def test_removes_lines_repeated_across_pages():
+    pages = [
+        {
+            "page_number": 1,
+            "text": "Study Name Page 1\nBody A\nJournal Footer\nShared twice",
+        },
+        {
+            "page_number": 2,
+            "text": "Study Name Page 2\nBody B\nJournal Footer\nShared twice",
+        },
+        {
+            "page_number": 3,
+            "text": "Study Name Page 3\nBody C\nJournal Footer",
+        },
+    ]
+
+    cleaned_pages = remove_repeated_lines(pages, min_occurrences=3)
+
+    # page-numbered headers should be recognized as the same repeated line
+    assert not any(
+        "Study Name Page" in page["text"]
+        for page in cleaned_pages
+    )
+
+    # the identical journal footer should be removed
+    assert not any("Journal Footer" in page["text"] for page in cleaned_pages)
+
+    # unique body text should remain
+    assert any("Body A" in page["text"] for page in cleaned_pages)
+    assert any("Body B" in page["text"] for page in cleaned_pages)
+    assert any("Body C" in page["text"] for page in cleaned_pages)
+
+    # a line appearing on only two pages should remain
+    assert sum(
+        "Shared twice" in page["text"]
+        for page in cleaned_pages
+    ) == 2

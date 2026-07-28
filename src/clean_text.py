@@ -1,3 +1,56 @@
+import re
+from collections import Counter
+
+def normalize_repeated_line(line):
+    # normalize spacing and capitalization for comparison
+    normalized_line = line.strip().lower()
+
+    # replace changing page numbers with one common placeholder
+    normalized_line = re.sub(
+        r"\bpage\s+\d+\b",
+        "page #",
+        normalized_line,
+    )
+
+    return normalized_line
+
+def remove_repeated_lines(extracted_pages, min_occurrences=3):
+    # count how many different pages contain each normalized line
+    line_counts = Counter()
+
+    for page_data in extracted_pages:
+        lines_on_page = {
+            normalize_repeated_line(line)
+            for line in page_data["text"].splitlines()
+            if line.strip()
+        }
+        line_counts.update(lines_on_page)
+
+    # identify lines that appear on at least the minimum number of pages
+    repeated_lines = {
+        line
+        for line, count in line_counts.items()
+        if count >= min_occurrences
+    }
+
+    # rebuild every page without the repeated lines
+    cleaned_pages = []
+
+    for page_data in extracted_pages:
+        kept_lines = [
+            line
+            for line in page_data["text"].splitlines()
+            if normalize_repeated_line(line) not in repeated_lines
+        ]
+
+        cleaned_pages.append({
+            **page_data,
+            "text": "\n".join(kept_lines).strip(),
+        })
+
+    return cleaned_pages
+
+
 def remove_reference_content(extracted_pages):
     # create a list for pages that remain searchable
     cleaned_pages = []
@@ -8,7 +61,7 @@ def remove_reference_content(extracted_pages):
     # go through pages in their original order
     for page_data in extracted_pages:
         # split the page text into individual lines
-        lines = page_data['text'].splitlines()
+        lines = page_data["text"].splitlines()
 
         # if currently inside references:
         if inside_references:

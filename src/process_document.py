@@ -5,7 +5,7 @@ from src.chunk_text import chunk_pages
 from src.extract_pdf import extract_pages
 from src.embeddings import embed_chunks, load_embedding_model
 from src.search import search_chunks
-from src.clean_text import remove_reference_content
+from src.clean_text import remove_reference_content, remove_repeated_lines
 from src.prompt import build_rag_prompt
 
 
@@ -13,8 +13,11 @@ def process_document(pdf_path, model, chunk_size=1000, overlap=200):
     # extract page-numbered text from the PDF
     extracted_pages = extract_pages(pdf_path)
 
+    # remove headers and footers that repeat across several pages
+    pages_without_repeated_lines = remove_repeated_lines(extracted_pages)
+
     # remove bibliography content before creating searchable chunks
-    searchable_pages = remove_reference_content(extracted_pages)
+    searchable_pages = remove_reference_content(pages_without_repeated_lines)
 
     # split the extracted pages into page-aware chunks
     chunks = chunk_pages(searchable_pages, chunk_size=chunk_size, overlap=overlap)
