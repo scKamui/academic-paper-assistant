@@ -4,6 +4,7 @@ from pathlib import Path
 from src.chunk_text import chunk_pages
 from src.extract_pdf import extract_pages
 from src.embeddings import embed_chunks, load_embedding_model
+from src.search import search_chunks
 
 
 def process_document(pdf_path, model, chunk_size=1000, overlap=200):
@@ -50,6 +51,21 @@ def main():
         default=200,
         help="Target number of overlapping characters between chunks.",
     )
+
+    # allow the student to search the processed paper
+    parser.add_argument(
+        "--query",
+        type=str,
+        help="Question or topic to search for in the PDF.",
+    )
+
+    # control how many matching passages are returned
+    parser.add_argument(
+        "--top-k",
+        type=int,
+        default=3,
+        help="Number of matching passages to return.",
+    )
     
     # read the command-line arguments
     args = parser.parse_args()
@@ -74,6 +90,28 @@ def main():
     print(f"Pages extracted: {page_count}")
     print(f"Chunks created: {chunk_count}")
     print(f"Embedding matrix: {result['embeddings'].shape}")
+
+    if args.query:
+        try:
+            search_results = search_chunks(
+                query=args.query,
+                chunks=result["chunks"],
+                embeddings=result["embeddings"],
+                model=model,
+                top_k=args.top_k,
+            )
+        except ValueError as error:
+            parser.error(str(error))
+
+        print("\nTop matching passages:")
+
+        for rank, search_result in enumerate(search_results, start=1):
+            print(
+                f"\n{rank}. Page {search_result['page_number']}, "
+                f"chunk {search_result['chunk_number']}, "
+                f"similarity {search_result['score']:.3f}"
+            )
+            print(search_result["text"][:500])
 
 
 if __name__ == "__main__":
