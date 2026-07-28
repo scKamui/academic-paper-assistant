@@ -1,3 +1,4 @@
+import pytest
 from src.chunk_text import chunk_pages
 
 
@@ -29,3 +30,14 @@ def test_chunks_page_text_with_overlap():
     assert chunks[0]["chunk_number"] == 1
     assert chunks[1]["chunk_number"] == 2
     assert chunks[2]["chunk_number"] == 3
+
+def test_rejects_zero_chunk_size():
+    # chunk size must be positive
+    with pytest.raises(ValueError):
+        chunk_pages([], chunk_size=0, overlap=0)
+
+
+def test_rejects_overlap_equal_to_chunk_size():
+    # overlap must be smaller than the chunk size
+    with pytest.raises(ValueError):
+        chunk_pages([], chunk_size=100, overlap=100)
