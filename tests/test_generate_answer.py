@@ -51,3 +51,36 @@ def test_rejects_empty_model_answer():
 
     with pytest.raises(ValueError, match="the model returned an empty answer"):
         generate_answer("Answer this question.", client=fake_client)
+
+
+
+
+def test_requests_json_when_json_mode_is_enabled():
+    # create a fake client that returns an empty JSON object
+    fake_client = MagicMock()
+    fake_completion = MagicMock()
+    fake_completion.choices[0].message.content = "{}"
+    fake_client.chat.completions.create.return_value = fake_completion
+
+    answer = generate_answer(
+        "Return a JSON object.",
+        client=fake_client,
+        json_mode=True,
+    )
+
+    assert answer == "{}"
+
+    # check that JSON mode was included in the request
+    fake_client.chat.completions.create.assert_called_once_with(
+        model=DEFAULT_MODEL,
+        messages=[
+            {
+                "role": "user",
+                "content": "Return a JSON object.",
+            }
+        ],
+        temperature=0.1,
+        response_format={
+            "type": "json_object"
+        },
+    )

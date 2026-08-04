@@ -8,7 +8,12 @@ from groq import Groq
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
 
-def generate_answer(prompt, model_name=DEFAULT_MODEL, client=None):
+def generate_answer(
+    prompt,
+    model_name=DEFAULT_MODEL,
+    client=None,
+    json_mode=False,
+):
     # reject a prompt that contains no useful text
     if not prompt.strip():
         raise ValueError("prompt must not be empty")
@@ -26,16 +31,27 @@ def generate_answer(prompt, model_name=DEFAULT_MODEL, client=None):
 
         client = Groq(api_key=api_key)
 
-    # send the grounded prompt to the language model
-    completion = client.chat.completions.create(
-        model=model_name,
-        messages=[
+    # store the options that will be sent to Groq
+    request_options = {
+        "model": model_name,
+        "messages": [
             {
                 "role": "user",
                 "content": prompt,
             }
         ],
-        temperature=0.1,
+        "temperature": 0.1,
+    }
+
+    # require a JSON response when structured analysis is requested
+    if json_mode:
+        request_options["response_format"] = {
+            "type": "json_object"
+        }
+
+    # send the grounded prompt to the language model
+    completion = client.chat.completions.create(
+        **request_options
     )
 
     # retrieve the text from the model's first response
