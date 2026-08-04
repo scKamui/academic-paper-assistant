@@ -1,5 +1,8 @@
+import pytest
+
 from src.structured_analysis import (
     FIELD_QUERIES,
+    generate_structured_analysis,
     retrieve_field_evidence,
 )
 
@@ -59,3 +62,43 @@ def test_retrieves_evidence_for_each_field(monkeypatch):
     # check that every search requested two passages
     for search_call in search_calls:
         assert search_call["top_k"] == 2
+
+
+
+def test_parses_structured_analysis_json(monkeypatch):
+    # replace the real API call with a predictable JSON response
+    def fake_generate_answer(prompt, client=None, json_mode=False):
+        assert prompt == "Analyze this paper."
+        assert json_mode is True
+
+        return """
+        {
+            "hypothesis": {
+                "found": false,
+                "summary": "Not found in the provided evidence.",
+                "evidence": []
+            }
+        }
+        """
+
+    monkeypatch.setattr(
+        "src.structured_analysis.generate_answer",
+        fake_generate_answer,
+    )
+
+    analysis = generate_structured_analysis("Analyze this paper.")
+
+    # check that the JSON text became a Python dictionary
+    assert analysis["hypothesis"]["found"] is False
+    assert analysis["hypothesis"]["evidence"] == []
+
+
+def test_rejects_invalid_structured_json(monkeypatch):
+    # make the fake model return text that is not JSON
+    monkeypatch.setattr(
+        "src.structured_analysis.generate_answer",
+        lambda *args, **kwargs: "This is not JSON.",
+    )
+
+    with pytest.raises(ValueError, match="the model returned invalid JSON"):
+        generate_structured_analysis("Analyze this paper.")
