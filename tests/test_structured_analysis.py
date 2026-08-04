@@ -1,0 +1,61 @@
+from src.structured_analysis import (
+    FIELD_QUERIES,
+    retrieve_field_evidence,
+)
+
+
+def test_retrieves_evidence_for_each_field(monkeypatch):
+    # create simple fake document data
+    chunks = [{"page_number": 1, "chunk_number": 1, "text": "Sample text"}]
+    embeddings = object()
+    embedding_model = object()
+
+    # store every search call so we can inspect it
+    search_calls = []
+
+    def fake_search_chunks(query, chunks, embeddings, model, top_k):
+        # record the information passed into the search function
+        search_calls.append({
+            "query": query,
+            "chunks": chunks,
+            "embeddings": embeddings,
+            "model": model,
+            "top_k": top_k,
+        })
+
+        # return predictable fake evidence
+        return [
+            {
+                "page_number": 2,
+                "chunk_number": 1,
+                "text": f"Evidence for: {query}",
+                "score": 0.9,
+            }
+        ]
+
+    # temporarily replace the real semantic search with our fake search
+    monkeypatch.setattr(
+        "src.structured_analysis.search_chunks",
+        fake_search_chunks,
+    )
+
+    evidence = retrieve_field_evidence(
+        chunks=chunks,
+        embeddings=embeddings,
+        embedding_model=embedding_model,
+        top_k=2,
+    )
+
+    # check that evidence was created for every required field
+    assert set(evidence.keys()) == set(FIELD_QUERIES.keys())
+
+    # check that the search function was called once for every field
+    assert len(search_calls) == len(FIELD_QUERIES)
+
+    # check that every field received the expected fake evidence
+    for field_name, query in FIELD_QUERIES.items():
+        assert evidence[field_name][0]["text"] == f"Evidence for: {query}"
+
+    # check that every search requested two passages
+    for search_call in search_calls:
+        assert search_call["top_k"] == 2
