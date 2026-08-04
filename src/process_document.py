@@ -7,6 +7,7 @@ from src.embeddings import embed_chunks, load_embedding_model
 from src.search import search_chunks
 from src.clean_text import remove_reference_content, remove_repeated_lines
 from src.prompt import build_rag_prompt
+from src.generate_answer import generate_answer
 
 
 def process_document(pdf_path, model, chunk_size=1000, overlap=200):
@@ -136,13 +137,21 @@ def main():
             )
             print(search_result["text"][:500])
 
-        if args.show_prompt:
-            prompt = build_rag_prompt(args.query, search_results)
+        # build the grounded prompt using the retrieved passages
+        prompt = build_rag_prompt(args.query, search_results)
 
+        # display the prompt only when requested
+        if args.show_prompt:
             print("\nGrounded prompt:")
             print("-" * 80)
             print(prompt)
             print("-" * 80)
+
+        # send the grounded prompt to Groq and display its answer
+        answer = generate_answer(prompt)
+
+        print("\nGenerated answer:")
+        print(answer)
 
 
 if __name__ == "__main__":
