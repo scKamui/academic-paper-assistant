@@ -15,6 +15,8 @@ from src.structured_analysis import analyze_document
 
 
 MAX_FILE_SIZE_MB = 20
+MAX_QUESTIONS_PER_SESSION = 10
+MAX_ANALYSES_PER_SESSION = 2
 
 
 def add_custom_styles():
@@ -203,6 +205,12 @@ def reset_document_state(file_id, file_name):
     st.session_state["question_history"] = []
 
 
+def initialize_usage_limits():
+    # keep API usage counts separate from the currently uploaded paper
+    st.session_state.setdefault("questions_used", 0)
+    st.session_state.setdefault("analyses_used", 0)
+
+
 st.set_page_config(
     page_title="CiteBack | Evidence-first paper reading",
     page_icon="◈",
@@ -210,6 +218,16 @@ st.set_page_config(
 )
 
 add_custom_styles()
+initialize_usage_limits()
+
+questions_remaining = max(
+    MAX_QUESTIONS_PER_SESSION - st.session_state["questions_used"],
+    0,
+)
+analyses_remaining = max(
+    MAX_ANALYSES_PER_SESSION - st.session_state["analyses_used"],
+    0,
+)
 
 st.markdown(
     '<div class="product-label">Evidence-first academic reading</div>',
@@ -241,13 +259,26 @@ with st.sidebar:
     st.markdown("### Privacy")
     st.caption(
         "The uploaded PDF is temporarily saved for text extraction and then "
-        "deleted. Its processed text remains only in the current app session."
+        "deleted. Processed text remains in the current app session. When an "
+        "AI feature is used, relevant passages are sent to Groq for generation."
+    )
+    st.divider()
+    st.markdown("### Demo usage")
+    st.caption(
+        f"{questions_remaining} of {MAX_QUESTIONS_PER_SESSION} questions and "
+        f"{analyses_remaining} of {MAX_ANALYSES_PER_SESSION} analyses remaining "
+        "in this browser session."
     )
 
 uploaded_file = st.file_uploader(
     "Start with a research paper",
     type=["pdf"],
     help=f"Text-based PDF files up to {MAX_FILE_SIZE_MB} MB are supported.",
+)
+st.caption(
+    "Only upload papers you have permission to process. The PDF itself is not "
+    "sent to Groq, but relevant text passages are sent when you ask a question "
+    "or generate an analysis. Do not upload confidential or sensitive material."
 )
 
 if uploaded_file is not None:
@@ -313,29 +344,39 @@ if document is not None:
             ask_question = st.form_submit_button(
                 "Ask CiteBack",
                 type="primary",
+                disabled=questions_remaining == 0,
             )
 
         if ask_question:
-            try:
-                with st.spinner("Searching the paper and preparing an answer..."):
-                    model = get_embedding_model()
-                    search_results = search_chunks(
-                        query=question,
-                        chunks=document["chunks"],
-                        embeddings=document["embeddings"],
-                        model=model,
-                        top_k=3,
-                    )
-                    prompt = build_rag_prompt(question, search_results)
-                    answer = generate_answer(prompt)
+            if not question.strip():
+                st.error("Enter a question before asking CiteBack.")
+            else:
+                # count the request before contacting the hosted model
+                st.session_state["questions_used"] += 1
 
-                    st.session_state["question_history"].append({
-                        "question": question,
-                        "answer": answer,
-                        "sources": search_results,
-                    })
-            except (APIError, ValueError) as error:
-                st.error(f"The question could not be answered: {error}")
+                try:
+                    with st.spinner("Searching the paper and preparing an answer..."):
+                        model = get_embedding_model()
+                        search_results = search_chunks(
+                            query=question,
+                            chunks=document["chunks"],
+                            embeddings=document["embeddings"],
+                            model=model,
+                            top_k=3,
+                        )
+                        prompt = build_rag_prompt(question, search_results)
+                        answer = generate_answer(prompt)
+
+                        st.session_state["question_history"].append({
+                            "question": question,
+                            "answer": answer,
+                            "sources": search_results,
+                        })
+                except (APIError, ValueError) as error:
+                    st.error(f"The question could not be answered: {error}")
+
+        if questions_remaining == 0:
+            st.info("The question limit for this browser session has been reached.")
 
         # keep earlier questions visible during the current session
         for history_item in reversed(st.session_state["question_history"]):
@@ -364,7 +405,16 @@ if document is not None:
             "major findings, and limitations with page-level evidence."
         )
 
-        if st.button("Generate analysis", type="primary"):
+        generate_analysis = st.button(
+            "Generate analysis",
+            type="primary",
+            disabled=analyses_remaining == 0,
+        )
+
+        if generate_analysis:
+            # one analysis uses two hosted model calls, so count it before starting
+            st.session_state["analyses_used"] += 1
+
             try:
                 with st.spinner("Analyzing and checking the evidence..."):
                     model = get_embedding_model()
@@ -375,6 +425,9 @@ if document is not None:
                     )
             except (APIError, ValueError) as error:
                 st.error(f"The analysis could not be completed: {error}")
+
+        if analyses_remaining == 0:
+            st.info("The analysis limit for this browser session has been reached.")
 
         analysis = st.session_state.get("analysis")
 

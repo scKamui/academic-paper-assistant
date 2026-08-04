@@ -14,3 +14,9 @@ def test_app_starts_without_an_error():
     assert not app.exception
     assert app.title[0].value == "CiteBack"
     assert app.file_uploader[0].label == "Start with a research paper"
+
+    # check that students are warned about hosted AI processing
+    assert any(
+        "relevant text passages are sent" in caption.value
+        for caption in app.caption
+    )

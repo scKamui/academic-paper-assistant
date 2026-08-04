@@ -8,7 +8,7 @@ Unlike a generic PDF chatbot, CiteBack treats trust as a product requirement. Ge
 
 ## Why I Built It
 
-Academic papers are often long, dense, and written using specialized language. Students may need to locate a hypothesis, understand a methodology, compare findings, or identify limitations under tight coursework deadlines.
+Academic papers are often long, dense, and sometimes hard to undertand. Students may need to locate a hypothesis, understand a methodology, compare findings, or identify limitations under tight coursework deadlines.
 
 I built CiteBack to explore how retrieval-augmented generation can make that process more approachable while still directing students back to the original source.
 
@@ -25,6 +25,7 @@ I built CiteBack to explore how retrieval-augmented generation can make that pro
 - Display supporting passages and PDF page citations.
 - Report when requested information cannot be found.
 - Delete the temporary uploaded PDF immediately after extraction.
+- Limit hosted AI usage per browser session in the public demo.
 
 ## Trust and Validation
 
@@ -108,6 +109,22 @@ The test suite covers PDF extraction, cleaning, chunking, prompt construction, A
 - Page-level citations based on PDF page order
 - Local in-memory document processing
 - No OCR for scanned documents yet
+- Demo limit of 10 questions and 2 structured analyses per browser session
+
+## Deploy to Streamlit Community Cloud
+
+1. Commit and push the project to GitHub.
+2. Choose the repository, the `main` branch, and `app.py` as the entrypoint.
+3. Open **Advanced settings** and select Python 3.11 to match local development.
+4. Add the Groq key through Streamlit Secrets rather than GitHub:
+
+```toml
+GROQ_API_KEY = "your_key_here"
+```
+
+5. Choose an available app URL and deploy.
+
+The public demo uses per-session limits to reduce accidental API usage. These limits can be reset by starting a new browser session, so a production release would also require accounts, server-side rate limiting, and provider spending controls.
 
 ## Planned Improvements
 
@@ -115,8 +132,10 @@ The test suite covers PDF extraction, cleaning, chunking, prompt construction, A
 - Compare findings across multiple papers.
 - Export structured notes with citations.
 - Add evaluation datasets for retrieval and answer quality.
-- Add user accounts and usage limits for deployment.
+- Add user accounts and server-wide usage limits.
 
 ## Privacy
 
-Uploaded files are written to a temporary location only because the PDF extractor requires a file path. The temporary file is deleted immediately after extraction. Processed text remains in memory for the current Streamlit session and is not intentionally stored permanently.
+Uploaded files are written to a temporary location only because the PDF extractor requires a file path. The temporary file is deleted immediately after extraction. Processed text remains in memory for the current Streamlit session and is not intentionally stored permanently by CiteBack.
+
+The uploaded PDF file itself is not sent to Groq. When a student asks a question or generates a structured analysis, CiteBack sends relevant retrieved text passages to the Groq API for response generation. Users should only upload documents they have permission to process and should not upload confidential, sensitive, or personally identifying material.
