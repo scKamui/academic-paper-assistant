@@ -2,7 +2,10 @@ import copy
 import json
 
 from src.generate_answer import generate_answer
-from src.prompt import build_analysis_verification_prompt
+from src.prompt import (
+    build_analysis_verification_prompt,
+    build_structured_analysis_prompt,
+)
 from src.search import search_chunks
 
 # use a separate search question for each part of the paper
@@ -59,6 +62,35 @@ def retrieve_field_evidence(
         evidence_by_field[field_name] = search_results
 
     return evidence_by_field
+
+
+def analyze_document(chunks, embeddings, embedding_model, top_k=5, client=None):
+    # retrieve different evidence for each part of the paper
+    evidence_by_field = retrieve_field_evidence(
+        chunks=chunks,
+        embeddings=embeddings,
+        embedding_model=embedding_model,
+        top_k=top_k,
+    )
+
+    # create the first analysis using only the retrieved paper text
+    prompt = build_structured_analysis_prompt(evidence_by_field)
+    analysis = generate_structured_analysis(prompt, client=client)
+
+    # check citations before asking the model to verify its claims
+    validate_structured_analysis(analysis, evidence_by_field)
+
+    # narrow or remove claims that are not fully supported
+    verified_analysis = verify_structured_analysis(
+        analysis,
+        evidence_by_field,
+        client=client,
+    )
+
+    # make sure the verification step did not create invalid output
+    validate_structured_analysis(verified_analysis, evidence_by_field)
+
+    return verified_analysis
 
 def generate_structured_analysis(prompt, client=None):
     # ask the model to return the analysis as JSON

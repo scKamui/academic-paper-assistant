@@ -9,14 +9,10 @@ from src.extract_pdf import extract_pages
 from src.generate_answer import generate_answer
 from src.prompt import (
     build_rag_prompt,
-    build_structured_analysis_prompt,
 )
 from src.search import search_chunks
 from src.structured_analysis import (
-    generate_structured_analysis,
-    retrieve_field_evidence,
-    validate_structured_analysis,
-    verify_structured_analysis,
+    analyze_document,
 )
 
 
@@ -184,41 +180,13 @@ def main():
         print(answer)
 
     if args.analyze:
-        # retrieve separate evidence for each part of the paper
-        evidence_by_field = retrieve_field_evidence(
-            chunks=result["chunks"],
-            embeddings=result["embeddings"],
-            embedding_model=model,
-            top_k=args.analysis_top_k,
-        )
-
-        # build one grounded prompt from all the retrieved evidence
-        structured_prompt = build_structured_analysis_prompt(
-            evidence_by_field
-        )
-
-        # generate and parse the structured response
+        # run the same validated analysis used by the interface
         try:
-            analysis = generate_structured_analysis(
-                structured_prompt
-            )
-
-            # check the response before displaying it to the student
-            validate_structured_analysis(
-                analysis,
-                evidence_by_field,
-            )
-
-            # use a second model pass to narrow claims that exceed their evidence
-            analysis = verify_structured_analysis(
-                analysis,
-                evidence_by_field,
-            )
-
-            # validate again in case the verifier changed a quote or page number
-            validate_structured_analysis(
-                analysis,
-                evidence_by_field,
+            analysis = analyze_document(
+                chunks=result["chunks"],
+                embeddings=result["embeddings"],
+                embedding_model=model,
+                top_k=args.analysis_top_k,
             )
         except ValueError as error:
             parser.error(str(error))
