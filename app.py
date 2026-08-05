@@ -383,7 +383,8 @@ if document is not None:
             with st.chat_message("user"):
                 st.write(history_item["question"])
 
-            with st.chat_message("assistant", avatar="◈"):
+            # use Streamlit's built-in assistant avatar for cloud compatibility
+            with st.chat_message("assistant"):
                 st.write(history_item["answer"])
 
                 with st.expander("Inspect supporting passages"):
