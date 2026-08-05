@@ -2,6 +2,7 @@ import copy
 import json
 
 from src.generate_answer import generate_answer
+from src.evidence_sources import build_source_index
 from src.prompt import (
     build_analysis_verification_prompt,
     build_structured_analysis_prompt,
@@ -10,22 +11,24 @@ from src.search import search_chunks
 
 # use a separate search question for each part of the paper
 FIELD_QUERIES = {
+    "document_type": (
+        "What evidence identifies the document as an original study, review "
+        "article, reference entry, or another type of academic text?"
+    ),
     "hypothesis": (
-        "What aim, purpose, objective, or explicit hypothesis do the authors "
-        "state for this review?"
+        "What hypothesis, research question, aim, purpose, or objective do the "
+        "authors state?"
     ),
     "methodology": (
-        "How did the authors search for and select literature, including search "
-        "terms, date range, and exclusions?"
+        "What methods did the authors use, such as participants, data collection, "
+        "analysis, experiments, or literature search and selection?"
     ),
     "findings": (
-        "What do the authors conclude overall about how e-cigarettes affect "
-        "heart and lung physiology?"
+        "What main results, conclusions, arguments, or themes do the authors report?"
     ),
     "author_stated_limitations": (
-        "What study weaknesses do the authors describe, including short duration, "
-        "cross-sectional design, animal models, varied devices, or conflicts of "
-        "interest?"
+        "What limitations, weaknesses, uncertainties, evidence gaps, or boundaries "
+        "do the authors explicitly describe?"
     ),
 }
 
@@ -75,7 +78,13 @@ def analyze_document(chunks, embeddings, embedding_model, top_k=5, client=None):
 
     # create the first analysis using only the retrieved paper text
     prompt = build_structured_analysis_prompt(evidence_by_field)
-    analysis = generate_structured_analysis(prompt, client=client)
+    referenced_analysis = generate_structured_analysis(prompt, client=client)
+
+    # replace the model's source IDs with the original page text from our search
+    analysis = hydrate_analysis_evidence(
+        referenced_analysis,
+        evidence_by_field,
+    )
 
     # check citations before asking the model to verify its claims
     validate_structured_analysis(analysis, evidence_by_field)
@@ -111,6 +120,103 @@ def generate_structured_analysis(prompt, client=None):
         raise ValueError("the structured analysis must be a JSON object")
 
     return analysis
+
+
+def hydrate_analysis_evidence(analysis, evidence_by_field):
+    # make a copy so the raw model response is not changed in place
+    hydrated_analysis = copy.deepcopy(analysis)
+    source_index = build_source_index(evidence_by_field)
+
+    def hydrate_evidence_list(evidence, field_name):
+        if not isinstance(evidence, list):
+            raise ValueError(f"{field_name} evidence must be a list")
+
+        hydrated_evidence = []
+
+        for evidence_item in evidence:
+            if not isinstance(evidence_item, dict):
+                raise ValueError(f"{field_name} evidence must contain objects")
+
+            source_id = evidence_item.get("source_id")
+
+            # reject IDs the model made up instead of silently trusting them
+            if source_id not in source_index:
+                raise ValueError(
+                    f"{field_name} uses an unknown source ID: {source_id}"
+                )
+
+            source = source_index[source_id]
+            hydrated_evidence.append({
+                "page_number": source["page_number"],
+                "passage": source["text"],
+            })
+
+        return hydrated_evidence
+
+    document_type = hydrated_analysis.get("document_type")
+
+    if isinstance(document_type, dict):
+        document_type["evidence"] = hydrate_evidence_list(
+            document_type.get("evidence"),
+            "document_type",
+        )
+
+    for field_name in ("hypothesis", "methodology"):
+        field_data = hydrated_analysis.get(field_name)
+
+        if isinstance(field_data, dict):
+            field_data["evidence"] = hydrate_evidence_list(
+                field_data.get("evidence"),
+                field_name,
+            )
+
+    for field_name in ("findings", "author_stated_limitations"):
+        field_data = hydrated_analysis.get(field_name)
+
+        if not isinstance(field_data, dict):
+            continue
+
+        items = field_data.get("items")
+
+        if not isinstance(items, list):
+            continue
+
+        for item_number, item in enumerate(items, start=1):
+            if isinstance(item, dict):
+                item["evidence"] = hydrate_evidence_list(
+                    item.get("evidence"),
+                    f"{field_name} item {item_number}",
+                )
+
+    ai_limitations = hydrated_analysis.get("ai_suggested_limitations")
+
+    if isinstance(ai_limitations, list):
+        for item_number, item in enumerate(ai_limitations, start=1):
+            if not isinstance(item, dict):
+                continue
+
+            source_ids = item.pop("based_on_source_ids", None)
+
+            if not isinstance(source_ids, list):
+                raise ValueError(
+                    f"AI limitation {item_number} source IDs must be a list"
+                )
+
+            pages = []
+
+            for source_id in source_ids:
+                if source_id not in source_index:
+                    raise ValueError(
+                        f"AI limitation {item_number} uses an unknown source ID: "
+                        f"{source_id}"
+                    )
+
+                pages.append(source_index[source_id]["page_number"])
+
+            # remove duplicates while keeping the pages in their original order
+            item["based_on_pages"] = list(dict.fromkeys(pages))
+
+    return hydrated_analysis
 
 
 def verify_structured_analysis(analysis, evidence_by_field, client=None):
@@ -326,8 +432,18 @@ def validate_structured_analysis(analysis, evidence_by_field):
     if not isinstance(document_type, dict):
         raise ValueError("document_type must be an object")
 
-    if document_type.get("type") not in ("review_article", "original_study"):
-        raise ValueError("document_type must be review_article or original_study")
+    allowed_document_types = (
+        "review_article",
+        "original_study",
+        "reference_entry",
+        "other_academic_text",
+    )
+
+    if document_type.get("type") not in allowed_document_types:
+        raise ValueError(
+            "document_type must be review_article, original_study, "
+            "reference_entry, or other_academic_text"
+        )
 
     if not isinstance(document_type.get("explanation"), str) or not document_type["explanation"].strip():
         raise ValueError("document_type needs an explanation")

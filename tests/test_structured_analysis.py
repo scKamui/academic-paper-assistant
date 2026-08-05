@@ -6,10 +6,70 @@ import pytest
 from src.structured_analysis import (
     FIELD_QUERIES,
     generate_structured_analysis,
+    hydrate_analysis_evidence,
     retrieve_field_evidence,
     validate_structured_analysis,
     verify_structured_analysis,
 )
+
+
+def test_hydrates_source_ids_with_original_passages():
+    evidence = create_retrieved_evidence()
+    referenced_analysis = {
+        "document_type": {
+            "type": "reference_entry",
+            "explanation": "This is a reference entry.",
+            "evidence": [{"source_id": "hypothesis-1"}],
+        },
+        "hypothesis": {
+            "found": False,
+            "statement_type": "Not applicable",
+            "summary": "Not found in the provided evidence.",
+            "evidence": [],
+        },
+        "methodology": {
+            "found": True,
+            "summary": "The authors searched a database.",
+            "evidence": [{"source_id": "methodology-1"}],
+        },
+        "findings": {
+            "found": True,
+            "items": [{
+                "claim": "Vaping affected lung function.",
+                "evidence": [{"source_id": "findings-1"}],
+            }],
+        },
+        "author_stated_limitations": {"found": False, "items": []},
+        "ai_suggested_limitations": [{
+            "suggestion": "The evidence may be short term.",
+            "reason": "The source describes a limited period.",
+            "based_on_source_ids": ["findings-1"],
+        }],
+    }
+
+    hydrated = hydrate_analysis_evidence(referenced_analysis, evidence)
+
+    # Python supplies the exact passage and page instead of trusting copied text
+    assert hydrated["findings"]["items"][0]["evidence"] == [{
+        "page_number": 3,
+        "passage": "Vaping affected lung function.",
+    }]
+    assert hydrated["ai_suggested_limitations"][0]["based_on_pages"] == [3]
+    assert "based_on_source_ids" not in hydrated["ai_suggested_limitations"][0]
+
+
+def test_rejects_an_unknown_source_id():
+    evidence = create_retrieved_evidence()
+    referenced_analysis = {
+        "document_type": {
+            "type": "review_article",
+            "explanation": "This is a review.",
+            "evidence": [{"source_id": "made-up-99"}],
+        },
+    }
+
+    with pytest.raises(ValueError, match="unknown source ID"):
+        hydrate_analysis_evidence(referenced_analysis, evidence)
 
 
 def test_retrieves_evidence_for_each_field(monkeypatch):
@@ -169,6 +229,14 @@ def create_valid_analysis():
 def create_retrieved_evidence():
     # imitate the page-numbered passages returned by semantic search
     return {
+        "document_type": [
+            {
+                "page_number": 1,
+                "chunk_number": 1,
+                "text": "This article reviews earlier research.",
+                "score": 0.95,
+            }
+        ],
         "hypothesis": [
             {
                 "page_number": 1,

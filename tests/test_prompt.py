@@ -49,6 +49,14 @@ def test_builds_grounded_prompt_with_sources():
 def test_builds_structured_analysis_prompt():
     # create sample evidence for each structured field
     evidence_by_field = {
+        "document_type": [
+            {
+                "page_number": 1,
+                "chunk_number": 1,
+                "text": "This entry provides an overview of criminology.",
+                "score": 0.95,
+            }
+        ],
         "hypothesis": [
             {
                 "page_number": 2,
@@ -80,15 +88,17 @@ def test_builds_structured_analysis_prompt():
 
     # check that each field has its own evidence section
     assert "Hypothesis evidence:" in prompt
+    assert "Document Type evidence:" in prompt
     assert "Methodology evidence:" in prompt
     assert "Findings evidence:" in prompt
     assert "Author Stated Limitations evidence:" in prompt
 
     # check that the passages and page labels appear
     assert "The authors expected vaping to affect lung function." in prompt
-    assert "[Source 1 | PDF page 2 | Chunk 1]" in prompt
-    assert "[Source 1 | PDF page 6 | Chunk 5]" in prompt
-    assert "[Source 1 | PDF page 4 | Chunk 5]" in prompt
+    assert "[Source ID document_type-1 | PDF page 1 | Chunk 1]" in prompt
+    assert "[Source ID hypothesis-1 | PDF page 2 | Chunk 1]" in prompt
+    assert "[Source ID findings-1 | PDF page 6 | Chunk 5]" in prompt
+    assert "[Source ID author_stated_limitations-1 | PDF page 4 | Chunk 5]" in prompt
 
     # check that an empty field is clearly identified
     assert "No passages were retrieved for this field." in prompt
@@ -103,8 +113,10 @@ def test_builds_structured_analysis_prompt():
     assert '"items"' in prompt
 
     # check the important grounding instructions
-    assert "Every extracted claim must include its own supporting passage" in prompt
+    assert "Every extracted claim must include its own supporting source ID" in prompt
+    assert "Do not copy or rewrite passages or page numbers" in prompt
     assert "Do not describe a review article as an experiment" in prompt
+    assert "reference_entry" in prompt
     assert "return 2 to 4 distinct major claims" in prompt
     assert "return 2 to 4 distinct items" in prompt
     assert "Do not repeat an author-stated limitation" in prompt
@@ -112,6 +124,7 @@ def test_builds_structured_analysis_prompt():
     assert "Return only valid JSON" in prompt
     assert '"found": false' in prompt
     assert '"evidence": []' in prompt
+    assert '"source_id"' in prompt
 
 
 def test_builds_analysis_verification_prompt():

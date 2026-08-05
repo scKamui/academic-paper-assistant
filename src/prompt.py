@@ -52,8 +52,10 @@ def build_structured_analysis_prompt(evidence_by_field):
         formatted_sources = []
 
         for source_number, result in enumerate(search_results, start=1):
+            # use a unique ID so the model does not have to copy the passage
+            source_id = f"{field_name}-{source_number}"
             source = (
-                f"[Source {source_number} | "
+                f"[Source ID {source_id} | "
                 f"PDF page {result['page_number']} | "
                 f"Chunk {result['chunk_number']}]\n"
                 f"{result['text']}"
@@ -83,10 +85,13 @@ Analyze the paper using only the evidence provided below.
 
 Rules:
 - Do not invent a hypothesis, methodology, finding, or author-stated limitation.
-- First identify whether the document is a review article or an original study.
+- First identify whether the document is a review article, original study,
+  reference entry, or another type of academic text.
 - Do not describe a review article as an experiment or original study.
-- Every extracted claim must include its own supporting passage and PDF page number.
-- Each evidence passage must directly support the claim it is attached to.
+- Every extracted claim must include its own supporting source ID.
+- Select only source IDs shown in the supplied evidence. Never create a source ID.
+- Do not copy or rewrite passages or page numbers in the JSON.
+- Each selected source must directly support the claim it is attached to.
 - Do not combine several claims when the evidence supports only one of them.
 - Use only page numbers that appear in the supplied evidence.
 - If information cannot be found, mark it as not found.
@@ -106,12 +111,11 @@ Return JSON using this exact structure:
 
 {{
   "document_type": {{
-    "type": "review_article or original_study",
+    "type": "review_article, original_study, reference_entry, or other_academic_text",
     "explanation": "A concise explanation of the document type.",
     "evidence": [
       {{
-        "page_number": 1,
-        "passage": "A short passage that supports the document type."
+        "source_id": "document_type-1"
       }}
     ]
   }},
@@ -121,8 +125,7 @@ Return JSON using this exact structure:
     "summary": "A concise hypothesis or objective with no unsupported claims.",
     "evidence": [
       {{
-        "page_number": 1,
-        "passage": "A short supporting passage from the evidence."
+        "source_id": "hypothesis-1"
       }}
     ]
   }},
@@ -131,8 +134,7 @@ Return JSON using this exact structure:
     "summary": "A concise explanation of the methodology.",
     "evidence": [
       {{
-        "page_number": 1,
-        "passage": "A short supporting passage from the evidence."
+        "source_id": "methodology-1"
       }}
     ]
   }},
@@ -143,8 +145,7 @@ Return JSON using this exact structure:
         "claim": "One major finding.",
         "evidence": [
           {{
-            "page_number": 1,
-            "passage": "A short passage that directly supports this finding."
+            "source_id": "findings-1"
           }}
         ]
       }}
@@ -157,8 +158,7 @@ Return JSON using this exact structure:
         "claim": "One limitation explicitly stated by the authors.",
         "evidence": [
           {{
-            "page_number": 1,
-            "passage": "A short passage that directly supports this limitation."
+            "source_id": "author_stated_limitations-1"
           }}
         ]
       }}
@@ -168,7 +168,7 @@ Return JSON using this exact structure:
     {{
       "suggestion": "A possible limitation inferred by the AI.",
       "reason": "Why this may be a limitation.",
-      "based_on_pages": [1]
+      "based_on_source_ids": ["methodology-1"]
     }}
   ]
 }}
