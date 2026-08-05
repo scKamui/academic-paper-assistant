@@ -1,11 +1,16 @@
 import os
 
 from dotenv import load_dotenv
-from groq import Groq
+from groq import Groq, RateLimitError
 
 
 # use one model name so it is easy to replace later
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
+
+
+class HostedAIUsageLimitError(Exception):
+    # keep the provider's private technical details out of the public interface
+    pass
 
 
 def generate_answer(
@@ -41,6 +46,8 @@ def generate_answer(
             }
         ],
         "temperature": 0.1,
+        # prevent one response from using an unnecessary number of tokens
+        "max_completion_tokens": 2000 if json_mode else 800,
     }
 
     # require a JSON response when structured analysis is requested
@@ -50,9 +57,16 @@ def generate_answer(
         }
 
     # send the grounded prompt to the language model
-    completion = client.chat.completions.create(
-        **request_options
-    )
+    try:
+        completion = client.chat.completions.create(
+            **request_options
+        )
+    except RateLimitError as error:
+        # show students a useful message instead of Groq account information
+        raise HostedAIUsageLimitError(
+            "CiteBack has reached its current AI usage limit. "
+            "Please try again later."
+        ) from error
 
     # retrieve the text from the model's first response
     answer = completion.choices[0].message.content

@@ -1,8 +1,14 @@
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
+from groq import RateLimitError
 
-from src.generate_answer import DEFAULT_MODEL, generate_answer
+from src.generate_answer import (
+    DEFAULT_MODEL,
+    HostedAIUsageLimitError,
+    generate_answer,
+)
 
 
 def test_generates_answer_using_fake_client():
@@ -33,6 +39,7 @@ def test_generates_answer_using_fake_client():
             }
         ],
         temperature=0.1,
+        max_completion_tokens=800,
     )
 
 
@@ -80,7 +87,25 @@ def test_requests_json_when_json_mode_is_enabled():
             }
         ],
         temperature=0.1,
+        max_completion_tokens=2000,
         response_format={
             "type": "json_object"
         },
     )
+
+
+def test_replaces_rate_limit_details_with_a_safe_message():
+    fake_client = MagicMock()
+    request = httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions")
+    response = httpx.Response(429, request=request)
+    fake_client.chat.completions.create.side_effect = RateLimitError(
+        "private provider details",
+        response=response,
+        body={"organization": "private-id"},
+    )
+
+    with pytest.raises(
+        HostedAIUsageLimitError,
+        match="CiteBack has reached its current AI usage limit",
+    ):
+        generate_answer("Answer this question.", client=fake_client)

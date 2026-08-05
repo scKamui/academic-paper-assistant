@@ -247,7 +247,6 @@ def verify_structured_analysis(analysis, evidence_by_field, client=None):
     # ask the model to compare its first analysis with the original sources
     verification_prompt = build_analysis_verification_prompt(
         analysis,
-        evidence_by_field,
     )
 
     # ask only for decisions so the model cannot replace citations or quotes

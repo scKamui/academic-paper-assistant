@@ -193,23 +193,8 @@ Evidence:
     return prompt
 
 
-def build_analysis_verification_prompt(analysis, evidence_by_field):
-    # format all retrieved passages so the verifier can check the original text
-    formatted_sources = []
-
-    for field_name, search_results in evidence_by_field.items():
-        for result in search_results:
-            source = (
-                f"[{field_name} | "
-                f"PDF page {result['page_number']} | "
-                f"Chunk {result['chunk_number']}]\n"
-                f"{result['text']}"
-            )
-            formatted_sources.append(source)
-
-    context = "\n\n".join(formatted_sources)
-
-    # convert the first analysis back into readable JSON for the verifier
+def build_analysis_verification_prompt(analysis):
+    # the analysis already contains the exact passages attached by Python
     analysis_json = json.dumps(analysis, indent=2)
 
     prompt = f"""
@@ -272,9 +257,6 @@ remain unchanged when the original wording is already fully supported.
 
 Analysis to verify:
 {analysis_json}
-
-Original retrieved sources:
-{context}
 """.strip()
 
     return prompt

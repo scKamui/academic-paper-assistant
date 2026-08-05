@@ -147,29 +147,17 @@ def test_builds_analysis_verification_prompt():
             ],
         }
     }
-    evidence_by_field = {
-        "findings": [
-            {
-                "page_number": 6,
-                "chunk_number": 2,
-                "text": "Vaping may worsen asthma.",
-                "score": 0.8,
-            }
-        ]
-    }
-
-    prompt = build_analysis_verification_prompt(
-        analysis,
-        evidence_by_field,
-    )
+    prompt = build_analysis_verification_prompt(analysis)
 
     # check that the claim, evidence, and source location are available for review
     assert "Vaping causes several lung diseases." in prompt
     assert "Vaping may worsen asthma." in prompt
-    assert "PDF page 6" in prompt
+    assert '"page_number": 6' in prompt
 
     # check that the verifier is told how to handle an overbroad claim
     assert "rewrite the claim more narrowly" in prompt
     assert "Do not return or rewrite evidence passages" in prompt
     assert '"item_number": 1' in prompt
     assert '"revised_claim"' in prompt
+    # passages are already attached, so a second source collection is unnecessary
+    assert "Original retrieved sources:" not in prompt

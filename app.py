@@ -7,7 +7,7 @@ from groq import APIError
 from pypdf.errors import PdfReadError
 
 from src.embeddings import load_embedding_model
-from src.generate_answer import generate_answer
+from src.generate_answer import HostedAIUsageLimitError, generate_answer
 from src.process_document import process_document
 from src.prompt import build_rag_prompt
 from src.search import search_chunks
@@ -267,7 +267,8 @@ with st.sidebar:
     st.caption(
         f"{questions_remaining} of {MAX_QUESTIONS_PER_SESSION} questions and "
         f"{analyses_remaining} of {MAX_ANALYSES_PER_SESSION} analyses remaining "
-        "in this browser session."
+        "in this browser session. The hosted AI allowance is shared across "
+        "the public demo, so it may occasionally need time to reset."
     )
 
 uploaded_file = st.file_uploader(
@@ -372,7 +373,12 @@ if document is not None:
                             "answer": answer,
                             "sources": search_results,
                         })
+                except HostedAIUsageLimitError as error:
+                    # do not use a student's session attempt when Groq is unavailable
+                    st.session_state["questions_used"] -= 1
+                    st.warning(str(error))
                 except (APIError, ValueError) as error:
+                    st.session_state["questions_used"] -= 1
                     st.error(f"The question could not be answered: {error}")
 
         if questions_remaining == 0:
@@ -424,7 +430,12 @@ if document is not None:
                         embeddings=document["embeddings"],
                         embedding_model=model,
                     )
+            except HostedAIUsageLimitError as error:
+                # let the student retry later without losing an analysis attempt
+                st.session_state["analyses_used"] -= 1
+                st.warning(str(error))
             except (APIError, ValueError) as error:
+                st.session_state["analyses_used"] -= 1
                 st.error(f"The analysis could not be completed: {error}")
 
         if analyses_remaining == 0:
