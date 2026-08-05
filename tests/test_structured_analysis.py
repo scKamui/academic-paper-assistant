@@ -5,12 +5,31 @@ import pytest
 
 from src.structured_analysis import (
     FIELD_QUERIES,
+    apply_document_type_rules,
     generate_structured_analysis,
     hydrate_analysis_evidence,
     retrieve_field_evidence,
     validate_structured_analysis,
     verify_structured_analysis,
 )
+
+
+def test_reference_entry_does_not_report_study_limitations():
+    analysis = create_valid_analysis()
+    analysis["document_type"]["type"] = "reference_entry"
+    analysis["author_stated_limitations"] = {
+        "found": True,
+        "items": [{"claim": "A theory has weaknesses.", "evidence": []}],
+    }
+
+    cleaned_analysis = apply_document_type_rules(analysis)
+
+    # a reference entry should not pretend topic criticism is a study limitation
+    assert cleaned_analysis["author_stated_limitations"] == {
+        "found": False,
+        "items": [],
+    }
+    assert cleaned_analysis["ai_suggested_limitations"] == []
 
 
 def test_hydrates_source_ids_with_original_passages():

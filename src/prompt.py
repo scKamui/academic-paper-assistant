@@ -97,8 +97,16 @@ Rules:
 - If information cannot be found, mark it as not found.
 - A research objective must be labelled as an objective, not as a hypothesis.
 - For findings, return 2 to 4 distinct major claims when the evidence supports them.
+- For a reference entry or other non-study text, treat findings as its main points
+  or conclusions and do not present them as experimental results.
 - For author-stated limitations, return 2 to 4 distinct items when available.
+- Author-stated limitations must describe limits of this document, its method,
+  its evidence, or the research it relies on.
+- Do not label criticism of a theory or topic discussed in the document as a
+  limitation of the document itself.
 - Keep author-stated limitations separate from AI-suggested limitations.
+- A limitation must concern the document or its evidence, not merely a theory
+  or topic that the document discusses.
 - AI-suggested limitations must be clearly labelled as inferences.
 - Do not repeat an author-stated limitation as an AI-suggested limitation.
 - If the authors directly describe an issue, classify it as author-stated rather than AI-suggested.

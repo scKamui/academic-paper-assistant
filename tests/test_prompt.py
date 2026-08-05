@@ -119,6 +119,8 @@ def test_builds_structured_analysis_prompt():
     assert "reference_entry" in prompt
     assert "return 2 to 4 distinct major claims" in prompt
     assert "return 2 to 4 distinct items" in prompt
+    assert "Do not label criticism of a theory" in prompt
+    assert "do not present them as experimental results" in prompt
     assert "Do not repeat an author-stated limitation" in prompt
     assert "must be a new inference" in prompt
     assert "Return only valid JSON" in prompt

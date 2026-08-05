@@ -27,8 +27,10 @@ FIELD_QUERIES = {
         "What main results, conclusions, arguments, or themes do the authors report?"
     ),
     "author_stated_limitations": (
-        "What limitations, weaknesses, uncertainties, evidence gaps, or boundaries "
-        "do the authors explicitly describe?"
+        "What limitations, weaknesses, uncertainties, evidence gaps, or scope "
+        "boundaries do the authors explicitly state about this document, its "
+        "method, its conclusions, or the research it relies on? Do not return "
+        "criticism of a theory or topic that is only being discussed."
     ),
 }
 
@@ -86,6 +88,9 @@ def analyze_document(chunks, embeddings, embedding_model, top_k=5, client=None):
         evidence_by_field,
     )
 
+    # reference entries explain a topic but do not report formal study limitations
+    apply_document_type_rules(analysis)
+
     # check citations before asking the model to verify its claims
     validate_structured_analysis(analysis, evidence_by_field)
 
@@ -100,6 +105,25 @@ def analyze_document(chunks, embeddings, embedding_model, top_k=5, client=None):
     validate_structured_analysis(verified_analysis, evidence_by_field)
 
     return verified_analysis
+
+
+def apply_document_type_rules(analysis):
+    document_type = analysis.get("document_type")
+
+    if not isinstance(document_type, dict):
+        return analysis
+
+    if document_type.get("type") == "reference_entry":
+        # avoid presenting criticism of a theory as a limitation of the document
+        analysis["author_stated_limitations"] = {
+            "found": False,
+            "items": [],
+        }
+
+        # inferred study limitations are not useful when this is not a study
+        analysis["ai_suggested_limitations"] = []
+
+    return analysis
 
 def generate_structured_analysis(prompt, client=None):
     # ask the model to return the analysis as JSON
