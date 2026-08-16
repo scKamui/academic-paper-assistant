@@ -60,7 +60,7 @@ flowchart LR
 - **LangChain text splitters** for context-aware chunking
 - **Sentence Transformers** for local embeddings
 - **NumPy** for similarity search
-- **Groq and Llama 3.3 70B** for grounded generation and verification
+- **Groq and GPT OSS 120B** for grounded generation and verification
 - **pytest** for automated tests
 
 ## Run Locally
